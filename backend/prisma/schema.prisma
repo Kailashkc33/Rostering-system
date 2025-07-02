@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String     @id @default(uuid())
+  email          String     @unique
+  name           String
+  password       String
+  role           Role       @default(STAFF)
+  hourlyWage     Float      @default(0)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  clockLogs      ClockLog[]
+  createdRosters Roster[]   @relation("CreatedBy")
+  shifts         Shift[]
+  deleted        Boolean    @default(false)
+
+  @@map("users")
+}
+
+model Roster {
+  id          String       @id @default(uuid())
+  weekStart   DateTime
+  status      RosterStatus @default(DRAFT)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdById String
+  createdBy   User         @relation("CreatedBy", fields: [createdById], references: [id])
+  shifts      Shift[]
+
+  @@map("rosters")
+}
+
+model Shift {
+  id         String     @id @default(uuid())
+  date       DateTime
+  startTime  DateTime
+  endTime    DateTime
+  role       String?
+  breakMinutes Int
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  rosterId   String
+  staffId    String
+  clockLogs  ClockLog[]
+  roster     Roster     @relation(fields: [rosterId], references: [id])
+  staff      User       @relation(fields: [staffId], references: [id])
+
+  @@map("shifts")
+}
+
+model ClockLog {
+  id        String    @id @default(uuid())
+  clockIn   DateTime
+  clockOut  DateTime?
+  ipAddress String
+  autoBreak Int
+  netHours  Float?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  staffId   String
+  shiftId   String
+  shift     Shift     @relation(fields: [shiftId], references: [id])
+  staff     User      @relation(fields: [staffId], references: [id])
+
+  @@map("clock_logs")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum RosterStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
