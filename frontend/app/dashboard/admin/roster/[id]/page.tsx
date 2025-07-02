@@ -14,7 +14,7 @@ type ShiftEdit = {
   [key: string]: any;
 };
 
-const STATUS_OPTIONS = ["DRAFT", "APPROVED", "ARCHIVED"];
+const STATUS_OPTIONS = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 
 export default function RosterDetailPage() {
   const { id } = useParams();
@@ -104,8 +104,20 @@ export default function RosterDetailPage() {
   };
 
   const handleEditShift = (shift) => {
+    // Add confirmation for published rosters
+    if (roster?.status === 'PUBLISHED') {
+      if (!window.confirm('This roster is already published. Editing will affect staff schedules. Are you sure you want to continue?')) {
+        return;
+      }
+    }
     setEditingShiftId(shift.id);
-    setShiftEdits({ ...shift });
+    // Better initialization of shift edit data
+    setShiftEdits({
+      ...shift,
+      date: shift.date ? new Date(shift.date).toISOString().slice(0, 10) : '',
+      startTime: shift.startTime ? new Date(shift.startTime).toTimeString().slice(0, 5) : '',
+      endTime: shift.endTime ? new Date(shift.endTime).toTimeString().slice(0, 5) : '',
+    });
   };
 
   const handleShiftEditChange = (field, value) => {
@@ -114,22 +126,33 @@ export default function RosterDetailPage() {
 
   const handleSaveShift = async () => {
     // Validate required fields
-    if (!shiftEdits.date || !shiftEdits.startTime || !shiftEdits.endTime) {
-      showToast("error", "Date, start time, and end time are required.");
+    if (!shiftEdits.staffId || !shiftEdits.date || !shiftEdits.startTime || !shiftEdits.endTime) {
+      showToast("error", "Staff, date, start time, and end time are required.");
       return;
     }
+
+    // Validate time logic
+    const startTime = new Date(`${shiftEdits.date}T${shiftEdits.startTime}`);
+    const endTime = new Date(`${shiftEdits.date}T${shiftEdits.endTime}`);
+    
+    if (endTime <= startTime) {
+      showToast("error", "End time must be after start time.");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
-      // Combine date and time into ISO strings
-      // If startTime is already in HH:mm, combine with date
-      const startISO = new Date(`${shiftEdits.date}T${shiftEdits.startTime}`).toISOString();
-      const endISO = new Date(`${shiftEdits.date}T${shiftEdits.endTime}`).toISOString();
-      // Prepare payload
+      
+      // Prepare payload with proper ISO strings
       const payload = {
-        ...shiftEdits,
-        startTime: startISO,
-        endTime: endISO,
+        staffId: shiftEdits.staffId,
+        date: shiftEdits.date,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        role: shiftEdits.role || '',
+        notes: shiftEdits.notes || '',
       };
+
       const res = await fetch(`http://localhost:3000/api/shifts/${editingShiftId}`, {
         method: "PUT",
         headers: {
@@ -138,18 +161,20 @@ export default function RosterDetailPage() {
         },
         body: JSON.stringify(payload),
       });
+      
       const data = await res.json();
       if (res.ok) {
         setRoster((prev) => ({
           ...prev,
           shifts: prev.shifts.map((s) => (s.id === editingShiftId ? data.shift : s)),
         }));
-        showToast("success", "Shift updated!");
+        showToast("success", roster?.status === 'PUBLISHED' ? "Published shift updated!" : "Shift updated!");
         setEditingShiftId(null);
       } else {
         showToast("error", data.error || "Failed to update shift");
       }
     } catch (err) {
+      console.error('Save shift error:', err);
       showToast("error", "Failed to update shift");
     }
   };
@@ -175,16 +200,43 @@ export default function RosterDetailPage() {
   };
 
   const handleAddShift = async () => {
+    // Validate required fields
+    if (!newShift.staffId || !newShift.date || !newShift.startTime || !newShift.endTime) {
+      showToast("error", "Staff, date, start time, and end time are required.");
+      return;
+    }
+
+    // Validate time logic
+    const startTime = new Date(`${newShift.date}T${newShift.startTime}`);
+    const endTime = new Date(`${newShift.date}T${newShift.endTime}`);
+    
+    if (endTime <= startTime) {
+      showToast("error", "End time must be after start time.");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
+      
+      // Prepare payload with proper ISO strings
+      const payload = {
+        staffId: newShift.staffId,
+        date: newShift.date,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        role: newShift.role || '',
+        notes: newShift.notes || '',
+      };
+
       const res = await fetch(`http://localhost:3000/api/rosters/${id}/shifts`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(newShift),
+        body: JSON.stringify(payload),
       });
+      
       const data = await res.json();
       if (res.ok) {
         setRoster((prev) => ({ ...prev, shifts: [...prev.shifts, data.shift] }));
@@ -195,6 +247,7 @@ export default function RosterDetailPage() {
         showToast("error", data.error || "Failed to add shift");
       }
     } catch (err) {
+      console.error('Add shift error:', err);
       showToast("error", "Failed to add shift");
     }
   };
@@ -244,7 +297,14 @@ export default function RosterDetailPage() {
               <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save Changes"}</Button>
             </form>
             <div className="mb-4 flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Shifts</h2>
+              <div>
+                <h2 className="text-xl font-semibold">Shifts</h2>
+                {roster.status === 'PUBLISHED' && (
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                    ⚠️ This roster is published. Changes will affect live staff schedules.
+                  </p>
+                )}
+              </div>
               <Button onClick={() => setAdding(true)}>Add Shift</Button>
             </div>
             <div className="overflow-x-auto">
@@ -270,9 +330,9 @@ export default function RosterDetailPage() {
                               {staffList.map(s => <option key={s.id} value={s.id}>{s.name || s.email}</option>)}
                             </select>
                           </td>
-                          <td className="px-4 py-2"><input type="date" value={shiftEdits.date?.slice(0,10) || ''} onChange={e => handleShiftEditChange('date', e.target.value)} className="border rounded px-2 py-1 w-full" /></td>
-                          <td className="px-4 py-2"><input type="time" value={shiftEdits.startTime?.slice(11,16) || ''} onChange={e => handleShiftEditChange('startTime', e.target.value)} className="border rounded px-2 py-1 w-full" /></td>
-                          <td className="px-4 py-2"><input type="time" value={shiftEdits.endTime?.slice(11,16) || ''} onChange={e => handleShiftEditChange('endTime', e.target.value)} className="border rounded px-2 py-1 w-full" /></td>
+                          <td className="px-4 py-2"><input type="date" value={shiftEdits.date || ''} onChange={e => handleShiftEditChange('date', e.target.value)} className="border rounded px-2 py-1 w-full" /></td>
+                          <td className="px-4 py-2"><input type="time" value={shiftEdits.startTime || ''} onChange={e => handleShiftEditChange('startTime', e.target.value)} className="border rounded px-2 py-1 w-full" /></td>
+                          <td className="px-4 py-2"><input type="time" value={shiftEdits.endTime || ''} onChange={e => handleShiftEditChange('endTime', e.target.value)} className="border rounded px-2 py-1 w-full" /></td>
                           <td className="px-4 py-2"><input type="text" value={shiftEdits.role || ''} onChange={e => handleShiftEditChange('role', e.target.value)} className="border rounded px-2 py-1 w-full" /></td>
                           <td className="px-4 py-2 flex gap-2">
                             <Button size="sm" onClick={handleSaveShift}>Save</Button>

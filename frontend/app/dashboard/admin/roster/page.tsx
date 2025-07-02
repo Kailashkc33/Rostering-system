@@ -14,7 +14,7 @@ interface Roster {
   updatedAt: string;
 }
 
-const STATUS_OPTIONS = ["DRAFT", "APPROVED", "ARCHIVED"];
+const STATUS_OPTIONS = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 
 export default function RosterListPage() {
   const [rosters, setRosters] = useState<Roster[]>([]);
@@ -122,7 +122,26 @@ export default function RosterListPage() {
                     <td className="px-4 py-2">{roster.createdBy?.name || roster.createdBy?.email}</td>
                     <td className="px-4 py-2 flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/admin/roster/${roster.id}`)}>View/Edit</Button>
-                      <Button variant="outline" size="sm">Copy</Button>
+                      <Button variant="outline" size="sm" onClick={async () => {
+                        if (!window.confirm('Copy this roster to the next week?')) return;
+                        try {
+                          const token = localStorage.getItem('token');
+                          const res = await fetch(`http://localhost:3000/api/rosters/${roster.id}/copy`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}` },
+                          });
+                          if (res.ok) {
+                            showToast('success', 'Roster copied successfully!');
+                            // Refresh the list
+                            window.location.reload();
+                          } else {
+                            const data = await res.json();
+                            showToast('error', data.error || 'Failed to copy roster');
+                          }
+                        } catch (err) {
+                          showToast('error', 'Failed to copy roster');
+                        }
+                      }}>Copy</Button>
                       <Button variant="destructive" size="sm" onClick={async () => {
                         if (!window.confirm('Are you sure you want to delete this roster?')) return;
                         try {

@@ -257,16 +257,16 @@ export const updateRoster = async (req: Request, res: Response) => {
     }
 
     // Validate allowed status values
-    const allowedStatuses = ["DRAFT", "APPROVED", "ARCHIVED"];
+    const allowedStatuses = ["DRAFT", "PUBLISHED", "ARCHIVED"];
     if (status && !allowedStatuses.includes(status)) {
       return res.status(400).json({ error: "Invalid status value." });
     }
 
-    // If approving, ensure roster has at least one shift
-    if (status === "APPROVED") {
+    // If publishing, ensure roster has at least one shift
+    if (status === "PUBLISHED") {
       const shiftCount = await prisma.shift.count({ where: { rosterId: id } });
       if (shiftCount === 0) {
-        return res.status(400).json({ error: "Cannot approve a roster with no shifts." });
+        return res.status(400).json({ error: "Cannot publish a roster with no shifts." });
       }
     }
 
