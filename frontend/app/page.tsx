@@ -57,7 +57,7 @@ export default function HomePage() {
             <p className="text-sm">Automatically calculates breaks based on shift length (30 or 60 minutes).</p>
           </div>
           <div className="bg-white dark:bg-gray-700 shadow-lg rounded-xl p-6 hover:shadow-xl transition-shadow">
-            <h3 className="text-xl font-semibold mb-2 text-[#FF6B35] dark:text-[#FFD166]">Live Clock-in</h3>
+            <h3 className="text-xl font-semibold mb-2 text-[#FF6B35] dark:text-[#FFD166]">Live Clock-in Only (conflict demo)</h3>
             <p className="text-sm">Staff can clock in/out from secure, verified devices or locations.</p>
           </div>
           <div className="bg-white dark:bg-gray-700 shadow-lg rounded-xl p-6 hover:shadow-xl transition-shadow">
