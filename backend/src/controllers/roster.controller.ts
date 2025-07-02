@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient, RosterStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -453,7 +453,7 @@ export const getMyRosters = async (req: Request, res: Response) => {
     // Find all approved rosters with at least one shift for this staff member
     const rosters = await prisma.roster.findMany({
       where: {
-        status: RosterStatus.PUBLISHED,
+        status: "PUBLISHED",
         shifts: {
           some: { staffId: user.id }
         }
